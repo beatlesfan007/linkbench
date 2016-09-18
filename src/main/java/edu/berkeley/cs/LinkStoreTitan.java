@@ -272,8 +272,9 @@ public class LinkStoreTitan extends GraphStore {
    * Do any cleanup.  After this is called, store won't be reused
    */
   @Override public void close() {
-    if (g.isOpen())
+    if (g.isOpen()) {
       g.shutdown();
+    }
   }
 
   @Override public void clearErrors(int threadID) {
