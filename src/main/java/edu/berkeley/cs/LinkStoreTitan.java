@@ -92,7 +92,7 @@ public class LinkStoreTitan extends GraphStore {
       } else {
         synchronized (requestPhaseLock) {
           if (!requestPhaseInitDone) {
-            long startId = Long.parseLong(p.getProperty("nodeidoffset")) + 1;
+            long startId = Long.parseLong(p.getProperty("maxid1")) + 1;
             LOG.info("Request phase: setting startId to " + startId);
             idGenerator.set(startId);
             //            TitanManagement mgmt = g.getManagementSystem();
