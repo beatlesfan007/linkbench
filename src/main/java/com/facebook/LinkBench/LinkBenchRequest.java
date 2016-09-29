@@ -23,6 +23,7 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
+import edu.berkeley.cs.LinkStoreTitan;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
@@ -850,6 +851,8 @@ public class LinkBenchRequest implements Runnable {
                        " not found = " + numnotfound +
                        " history queries = " + numHistoryQueries + "/" +
                                    stats.getCount(LinkBenchOp.GET_LINKS_LIST));
+    ((LinkStoreTitan) linkStore).writeQueriesPerEdge();
+    ((LinkStoreTitan) nodeStore).writeQueriesPerNode();
     closeStores();
   }
 
