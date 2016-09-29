@@ -557,9 +557,10 @@ public class LinkStoreTitan extends GraphStore {
 
   public void writeQueriesPerNode() {
     ArrayList<String> data = new ArrayList<>();
-    Enumeration<Long> iterator = queriesPerNode.keys();
+    Enumeration<Long> en = queriesPerNode.keys();
     Long id;
-    while ((id = iterator.nextElement()) != null) {
+    while (en.hasMoreElements()) {
+      id = en.nextElement();
       data.add(id + " " + queriesPerNode.get(id));
     }
     writeFile("queriesPerNode", data);
@@ -567,9 +568,10 @@ public class LinkStoreTitan extends GraphStore {
 
   public void writeQueriesPerEdge() {
     ArrayList<String> data = new ArrayList<>();
-    Enumeration<String> iterator = queriesPerEdge.keys();
+    Enumeration<String> en = queriesPerEdge.keys();
     String id;
-    while ((id = iterator.nextElement()) != null) {
+    while (en.hasMoreElements()) {
+      id = en.nextElement();
       data.add(id + " " + queriesPerEdge.get(id));
     }
     writeFile("queriesPerEdge", data);
