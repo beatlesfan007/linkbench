@@ -191,8 +191,8 @@ public class LinkStoreTitan extends GraphStore {
     long id = idGenerator.getAndIncrement();
     v.setProperty("iid", id);
     v.setProperty("node-data", new String(node.data));
-    tx.commit();
     updateQueriesPerNode(getNodeId(v));
+    tx.commit();
     return id;
   }
 
@@ -253,8 +253,8 @@ public class LinkStoreTitan extends GraphStore {
       return false;
     }
     v.setProperty("node-data", new String(node.data));
-    tx.commit();
     updateQueriesPerNode(getNodeId(v));
+    tx.commit();
     return true;
   }
 
@@ -314,13 +314,13 @@ public class LinkStoreTitan extends GraphStore {
       tx.rollback();
       return false;
     }
+    updateQueriesPerNode(getNodeId(src));
+    updateQueriesPerNode(getNodeId(dst));
     Edge e = tx.addEdge(null, src, dst, String.valueOf(a.link_type));
     e.setProperty("time", a.time);
     e.setProperty("edge-data", new String(a.data));
-    tx.commit();
-    updateQueriesPerNode(getNodeId(src));
-    updateQueriesPerNode(getNodeId(dst));
     updateQueriesPerEdge(e.getLabel());
+    tx.commit();
     return true;
   }
 
@@ -336,11 +336,11 @@ public class LinkStoreTitan extends GraphStore {
         tx.rollback();
         return;
       }
+      updateQueriesPerNode(getNodeId(src));
+      updateQueriesPerNode(getNodeId(dst));
       Edge e = tx.addEdge(null, src, dst, String.valueOf(a.link_type));
       e.setProperty("time", a.time);
       e.setProperty("edge-data", new String(a.data));
-      updateQueriesPerNode(getNodeId(src));
-      updateQueriesPerNode(getNodeId(dst));
       updateQueriesPerEdge(e.getLabel());
     }
     tx.commit();
