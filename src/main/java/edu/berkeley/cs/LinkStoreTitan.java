@@ -14,17 +14,25 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.log4j.Logger;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class LinkStoreTitan extends GraphStore {
   private final Logger LOG = Logger.getLogger("com.facebook.linkbench");
+  private static final String statsDir = "statics/";
   private static TitanGraph g = null;
   private AtomicLong idGenerator = new AtomicLong(1L);
   private static Comparator<Link> linkComparator;
   private final Object requestPhaseLock = new Object();
   private boolean requestPhaseInitDone = false;
+  private ConcurrentHashMap<Long, Integer> queriesPerNode;
+  private ConcurrentHashMap<String, Integer> queriesPerEdge;
 
   static {
     linkComparator = new Comparator<Link>() {
@@ -42,6 +50,8 @@ public class LinkStoreTitan extends GraphStore {
    */
   @Override public synchronized void initialize(Properties p, Phase currentPhase, int threadId)
     throws IOException {
+    queriesPerNode = new ConcurrentHashMap<>();
+    queriesPerEdge = new ConcurrentHashMap<>();
     LOG.info("Phase " + currentPhase.ordinal() + ", ThreadID = " + threadId + ", Object = " + this);
     if (g == null) {
       String configFile = p.getProperty("titan.config_file");
@@ -182,6 +192,7 @@ public class LinkStoreTitan extends GraphStore {
     v.setProperty("iid", id);
     v.setProperty("node-data", new String(node.data));
     tx.commit();
+    updateQueriesPerNode(getNodeId(v));
     return id;
   }
 
@@ -199,6 +210,7 @@ public class LinkStoreTitan extends GraphStore {
       v.setProperty("iid", id);
       v.setProperty("node-data", new String(node.data));
       ids[i++] = id;
+      updateQueriesPerNode(getNodeId(v));
     }
     tx.commit();
     return ids;
@@ -221,6 +233,7 @@ public class LinkStoreTitan extends GraphStore {
       tx.rollback();
       return null;
     }
+    updateQueriesPerNode(getNodeId(v));
     byte[] data = getNodeData(v);
     tx.commit();
     return new Node(id, 0, 0, 0, data);
@@ -241,6 +254,7 @@ public class LinkStoreTitan extends GraphStore {
     }
     v.setProperty("node-data", new String(node.data));
     tx.commit();
+    updateQueriesPerNode(getNodeId(v));
     return true;
   }
 
@@ -259,8 +273,10 @@ public class LinkStoreTitan extends GraphStore {
       return false;
     }
 
+    updateQueriesPerNode(getNodeId(v));
     for (Edge e : v.getEdges(Direction.OUT)) {
       e.remove();
+      updateQueriesPerEdge(e.getLabel());
     }
     v.remove();
 
@@ -302,6 +318,9 @@ public class LinkStoreTitan extends GraphStore {
     e.setProperty("time", a.time);
     e.setProperty("edge-data", new String(a.data));
     tx.commit();
+    updateQueriesPerNode(getNodeId(src));
+    updateQueriesPerNode(getNodeId(dst));
+    updateQueriesPerEdge(e.getLabel());
     return true;
   }
 
@@ -320,6 +339,9 @@ public class LinkStoreTitan extends GraphStore {
       Edge e = tx.addEdge(null, src, dst, String.valueOf(a.link_type));
       e.setProperty("time", a.time);
       e.setProperty("edge-data", new String(a.data));
+      updateQueriesPerNode(getNodeId(src));
+      updateQueriesPerNode(getNodeId(dst));
+      updateQueriesPerEdge(e.getLabel());
     }
     tx.commit();
   }
@@ -346,8 +368,10 @@ public class LinkStoreTitan extends GraphStore {
       tx.rollback();
       return false;
     }
+    updateQueriesPerNode(getNodeId(src));
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     for (Edge edge : edges) {
+      updateQueriesPerEdge(edge.getLabel());
       if (getNodeId(edge.getVertex(Direction.IN)) == id2
         && edge.getLabel().compareToIgnoreCase(String.valueOf(link_type)) == 0) {
         edge.remove();
@@ -375,8 +399,10 @@ public class LinkStoreTitan extends GraphStore {
       tx.rollback();
       return false;
     }
+    updateQueriesPerNode(getNodeId(src));
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     for (Edge edge : edges) {
+      updateQueriesPerEdge(edge.getLabel());
       if (getNodeId(edge.getVertex(Direction.IN)) == a.id2
         && edge.getLabel().compareToIgnoreCase(String.valueOf(a.link_type)) == 0) {
         edge.setProperty("time", a.time);
@@ -404,8 +430,10 @@ public class LinkStoreTitan extends GraphStore {
       tx.rollback();
       return null;
     }
+    updateQueriesPerNode(getNodeId(src));
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     for (Edge edge : edges) {
+      updateQueriesPerEdge(edge.getLabel());
       if (getNodeId(edge.getVertex(Direction.IN)) == id2
         && edge.getLabel().compareToIgnoreCase(String.valueOf(link_type)) == 0) {
         byte[] data = getEdgeData(edge);
@@ -435,9 +463,11 @@ public class LinkStoreTitan extends GraphStore {
       tx.rollback();
       return null;
     }
+    updateQueriesPerNode(getNodeId(src));
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     ArrayList<Link> links = new ArrayList<>();
     for (Edge edge : edges) {
+      updateQueriesPerEdge(edge.getLabel());
       if (edge != null && edge.getLabel().compareToIgnoreCase(String.valueOf(link_type)) == 0) {
         Vertex dst = edge.getVertex(Direction.IN);
         long id2 = getNodeId(dst);
@@ -469,9 +499,11 @@ public class LinkStoreTitan extends GraphStore {
       tx.rollback();
       return null;
     }
+    updateQueriesPerNode(getNodeId(src));
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     ArrayList<Link> links = new ArrayList<>();
     for (Edge edge : edges) {
+      updateQueriesPerEdge(edge.getLabel());
       Vertex dst = edge.getVertex(Direction.IN);
       long time = edge.getProperty("time");
       if (time >= minTimestamp && time >= maxTimestamp &&
@@ -496,14 +528,68 @@ public class LinkStoreTitan extends GraphStore {
       tx.rollback();
       return 0;
     }
+    updateQueriesPerNode(getNodeId(src));
     long count = 0;
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     for (Edge edge : edges) {
+      updateQueriesPerEdge(edge.getLabel());
       if (edge.getLabel().compareToIgnoreCase(String.valueOf(link_type)) == 0) {
         count++;
       }
     }
     tx.commit();
     return count;
+  }
+
+  private void updateQueriesPerNode(Long id) {
+    if (!queriesPerNode.contains(id))
+      queriesPerNode.put(id, 1);
+    else
+      queriesPerNode.put(id, queriesPerNode.get(id) + 1);
+  }
+
+  private void updateQueriesPerEdge(String id) {
+    if (!queriesPerEdge.contains(id))
+      queriesPerEdge.put(id, 1);
+    else
+      queriesPerEdge.put(id, queriesPerEdge.get(id) + 1);
+  }
+
+  public void writeQueriesPerNode() {
+    ArrayList<String> data = new ArrayList<>();
+    Enumeration<Long> iterator = queriesPerNode.keys();
+    Long id;
+    while ((id = iterator.nextElement()) != null) {
+      data.add(id + " " + queriesPerNode.get(id));
+    }
+    writeFile("queriesPerNode", data);
+  }
+
+  public void writeQueriesPerEdge() {
+    ArrayList<String> data = new ArrayList<>();
+    Enumeration<String> iterator = queriesPerEdge.keys();
+    String id;
+    while ((id = iterator.nextElement()) != null) {
+      data.add(id + " " + queriesPerEdge.get(id));
+    }
+    writeFile("queriesPerEdge", data);
+  }
+
+  public void writeFile(String filename, List<String> data) {
+    File directory = new File(String.valueOf(statsDir));
+    if (! directory.exists()) {
+      directory.mkdir();
+    }
+    File file = new File(Paths.get(statsDir, filename + "_" + System.currentTimeMillis()).toString());
+    try {
+      BufferedWriter writer = new BufferedWriter(new FileWriter(file.getAbsoluteFile()));
+      for (String line : data) {
+        writer.write(line + "\n");
+      }
+      writer.close();
+    } catch (IOException e) {
+      LOG.warn("Failed to open file " + file.getAbsolutePath());
+    }
+    return;
   }
 }

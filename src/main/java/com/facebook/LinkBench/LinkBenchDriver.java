@@ -21,6 +21,7 @@ import com.facebook.LinkBench.LinkBenchRequest.RequestProgress;
 import com.facebook.LinkBench.stats.LatencyStats;
 import com.facebook.LinkBench.stats.SampledStats;
 import com.facebook.LinkBench.util.ClassLoadUtil;
+import edu.berkeley.cs.LinkStoreTitan;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
 
@@ -391,6 +392,8 @@ public class LinkBenchDriver {
     progress.startTimer();
     // run requesters
     concurrentExec(requesters);
+    ((LinkStoreTitan) stores.linkStore).writeQueriesPerEdge();
+    ((LinkStoreTitan) stores.nodeStore).writeQueriesPerNode();
     closeStores(stores);
 
     long finishTime = System.currentTimeMillis();
