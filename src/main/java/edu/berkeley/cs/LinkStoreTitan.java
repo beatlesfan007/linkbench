@@ -276,7 +276,7 @@ public class LinkStoreTitan extends GraphStore {
     updateQueriesPerNode(getNodeId(v));
     for (Edge e : v.getEdges(Direction.OUT)) {
       e.remove();
-      updateQueriesPerEdge(e.getLabel());
+      updateQueriesPerEdge(e);
     }
     v.remove();
 
@@ -319,7 +319,7 @@ public class LinkStoreTitan extends GraphStore {
     Edge e = tx.addEdge(null, src, dst, String.valueOf(a.link_type));
     e.setProperty("time", a.time);
     e.setProperty("edge-data", new String(a.data));
-    updateQueriesPerEdge(e.getLabel());
+    updateQueriesPerEdge(e);
     tx.commit();
     return true;
   }
@@ -341,7 +341,7 @@ public class LinkStoreTitan extends GraphStore {
       Edge e = tx.addEdge(null, src, dst, String.valueOf(a.link_type));
       e.setProperty("time", a.time);
       e.setProperty("edge-data", new String(a.data));
-      updateQueriesPerEdge(e.getLabel());
+      updateQueriesPerEdge(e);
     }
     tx.commit();
   }
@@ -371,7 +371,7 @@ public class LinkStoreTitan extends GraphStore {
     updateQueriesPerNode(getNodeId(src));
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     for (Edge edge : edges) {
-      updateQueriesPerEdge(edge.getLabel());
+      updateQueriesPerEdge(edge);
       if (getNodeId(edge.getVertex(Direction.IN)) == id2
         && edge.getLabel().compareToIgnoreCase(String.valueOf(link_type)) == 0) {
         edge.remove();
@@ -402,7 +402,7 @@ public class LinkStoreTitan extends GraphStore {
     updateQueriesPerNode(getNodeId(src));
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     for (Edge edge : edges) {
-      updateQueriesPerEdge(edge.getLabel());
+      updateQueriesPerEdge(edge);
       if (getNodeId(edge.getVertex(Direction.IN)) == a.id2
         && edge.getLabel().compareToIgnoreCase(String.valueOf(a.link_type)) == 0) {
         edge.setProperty("time", a.time);
@@ -433,7 +433,7 @@ public class LinkStoreTitan extends GraphStore {
     updateQueriesPerNode(getNodeId(src));
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     for (Edge edge : edges) {
-      updateQueriesPerEdge(edge.getLabel());
+      updateQueriesPerEdge(edge);
       if (getNodeId(edge.getVertex(Direction.IN)) == id2
         && edge.getLabel().compareToIgnoreCase(String.valueOf(link_type)) == 0) {
         byte[] data = getEdgeData(edge);
@@ -467,7 +467,7 @@ public class LinkStoreTitan extends GraphStore {
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     ArrayList<Link> links = new ArrayList<>();
     for (Edge edge : edges) {
-      updateQueriesPerEdge(edge.getLabel());
+      updateQueriesPerEdge(edge);
       if (edge != null && edge.getLabel().compareToIgnoreCase(String.valueOf(link_type)) == 0) {
         Vertex dst = edge.getVertex(Direction.IN);
         long id2 = getNodeId(dst);
@@ -503,7 +503,7 @@ public class LinkStoreTitan extends GraphStore {
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     ArrayList<Link> links = new ArrayList<>();
     for (Edge edge : edges) {
-      updateQueriesPerEdge(edge.getLabel());
+      updateQueriesPerEdge(edge);
       Vertex dst = edge.getVertex(Direction.IN);
       long time = edge.getProperty("time");
       if (time >= minTimestamp && time >= maxTimestamp &&
@@ -532,7 +532,7 @@ public class LinkStoreTitan extends GraphStore {
     long count = 0;
     Iterable<Edge> edges = src.getEdges(Direction.OUT);
     for (Edge edge : edges) {
-      updateQueriesPerEdge(edge.getLabel());
+      updateQueriesPerEdge(edge);
       if (edge.getLabel().compareToIgnoreCase(String.valueOf(link_type)) == 0) {
         count++;
       }
@@ -548,11 +548,13 @@ public class LinkStoreTitan extends GraphStore {
       queriesPerNode.put(id, queriesPerNode.get(id) + 1);
   }
 
-  private void updateQueriesPerEdge(String id) {
-    if (!queriesPerEdge.contains(id))
-      queriesPerEdge.put(id, 1);
+  private void updateQueriesPerEdge(Edge edge) {
+    String nodePair = getNodeId(edge.getVertex(Direction.OUT)) + " "
+            + getNodeId(edge.getVertex(Direction.IN));
+    if (!queriesPerEdge.contains(nodePair))
+      queriesPerEdge.put(nodePair, 1);
     else
-      queriesPerEdge.put(id, queriesPerEdge.get(id) + 1);
+      queriesPerEdge.put(nodePair, queriesPerEdge.get(nodePair) + 1);
   }
 
   public void writeQueriesPerNode() {
@@ -569,10 +571,10 @@ public class LinkStoreTitan extends GraphStore {
   public void writeQueriesPerEdge() {
     ArrayList<String> data = new ArrayList<>();
     Enumeration<String> en = queriesPerEdge.keys();
-    String id;
+    String ids;
     while (en.hasMoreElements()) {
-      id = en.nextElement();
-      data.add(id + " " + queriesPerEdge.get(id));
+      ids = en.nextElement();
+      data.add(ids + " " + queriesPerEdge.get(ids));
     }
     writeFile("queriesPerEdge", data);
   }
